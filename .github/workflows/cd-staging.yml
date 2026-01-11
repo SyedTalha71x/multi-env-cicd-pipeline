@@ -58,7 +58,7 @@ jobs:
         GITHUB_SHA: ${{ github.event.inputs.version || github.sha }}
       run: |
         ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.STAGING_EC2_HOST }} '
-          cd /home/ubuntu/multi-env-cicd-app &&
+          cd /home/ubuntu/multi-env-cicd-pipeline &&
           ./scripts/health-check.sh staging
         '
     

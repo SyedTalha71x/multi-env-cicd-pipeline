@@ -126,12 +126,12 @@ jobs:
         
         # Health check script
         ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.PROD_EC2_HOST }} '
-          cd /home/ubuntu/multi-env-cicd-app
+          cd /home/ubuntu/multi-env-cicd-pipeline
           ./scripts/health-check.sh production
         '
         
         # Additional checks
-        PROD_URL="http://${{ secrets.PROD_EC2_HOST }}:3000"
+        PROD_URL="http://${{ secrets.PROD_EC2_HOST }}:3000/api/health"
         echo "Testing production endpoint: $PROD_URL"
         
         for i in {1..5}; do
