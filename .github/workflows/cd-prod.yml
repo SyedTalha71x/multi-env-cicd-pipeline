@@ -2,14 +2,55 @@ name: Deploy to Production
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Commit SHA to deploy (from staging)'
+        required: true
+        type: string
+      deployment_type:
+        description: 'Deployment type'
+        required: true
+        type: choice
+        options:
+          - standard
+          - hotfix
+        default: standard
 
 jobs:
-  deploy-prod:
+  deploy-production:
     runs-on: ubuntu-latest
-    environment: production
+    environment: 
+      name: production
+      url: http://${{ secrets.PROD_EC2_HOST }}:3000
     
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.event.inputs.version }}
+    
+    - name: Deployment info
+      run: |
+        echo "=================================="
+        echo "🚀 PRODUCTION Deployment Started"
+        echo "=================================="
+        echo "📝 Deploy SHA: ${{ github.event.inputs.version }}"
+        echo "👤 Triggered by: ${{ github.actor }}"
+        echo "📅 Date: $(date)"
+        echo "🏷️ Type: ${{ github.event.inputs.deployment_type }}"
+        echo "=================================="
+        echo "⚠️ PRODUCTION DEPLOYMENT - PROCEED WITH CAUTION"
+        echo "=================================="
+    
+    - name: Pre-deployment checklist
+      run: |
+        echo "📋 Pre-deployment checklist:"
+        echo "  ✅ Staging tests passed?"
+        echo "  ✅ Stakeholders notified?"
+        echo "  ✅ Rollback plan ready?"
+        echo "  ✅ Monitoring tools active?"
+        echo ""
+        echo "Waiting for environment approval..."
     
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v2
@@ -18,63 +59,172 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_REGION }}
     
-    - name: Manual approval for production
-      uses: trstringer/manual-approval@v1
-      with:
-        secret: ${{ github.token }}
-        approvers: ${{ secrets.PRODUCTION_APPROVERS }}
-        minimum-approvals: 1
-    
     - name: Login to Amazon ECR
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
     
-    - name: Build, tag, and push image to Amazon ECR
+    - name: Verify image exists in ECR
       env:
         REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         REPOSITORY: multi-env-cicd-app
-        IMAGE_TAG: ${{ github.event.inputs.version || github.sha }}
+        IMAGE_TAG: ${{ github.event.inputs.version }}
       run: |
-        docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
-        docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
-        echo "Image pushed to ECR"
+        echo "🔍 Verifying image in ECR..."
+        
+        if docker pull $REGISTRY/$REPOSITORY:$IMAGE_TAG; then
+          echo "✅ Image found and verified"
+          echo "📦 Image: $REGISTRY/$REPOSITORY:$IMAGE_TAG"
+        else
+          echo "❌ Image not found in ECR!"
+          echo "Please ensure staging deployment was successful"
+          exit 1
+        fi
     
-    - name: Deploy to EC2 (Production)
-      env:
-        AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-        AWS_REGION: ${{ secrets.AWS_REGION }}
-        GITHUB_SHA: ${{ github.event.inputs.version || github.sha }}
+    - name: Backup current production state
       run: |
-        echo "Starting production deployment..."
+        echo "💾 Creating backup of current production state..."
         ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.PROD_EC2_HOST }} '
-          cd /home/ubuntu/multi-env-cicd-app &&
-          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
-          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
-          AWS_REGION=${{ secrets.AWS_REGION }} \
-          GITHUB_SHA=$GITHUB_SHA \
+          cd /home/ubuntu/multi-env-cicd-app
+          
+          # Save current running container info
+          docker ps > /tmp/prod-backup-$(date +%Y%m%d-%H%M%S).txt
+          
+          # Tag current production image as backup
+          CURRENT_IMAGE=$(docker ps --format "{{.Image}}" | grep multi-env-cicd-app | head -1)
+          if [ ! -z "$CURRENT_IMAGE" ]; then
+            docker tag $CURRENT_IMAGE multi-env-cicd-app:last-known-good
+            echo "✅ Backup created: last-known-good"
+          fi
+        '
+        echo "✅ Backup completed!"
+    
+    - name: Deploy to EC2
+      env:
+        IMAGE_TAG: ${{ github.event.inputs.version }}
+      run: |
+        echo "🚀 Deploying to Production EC2..."
+        echo "⚠️ This will update the production environment"
+        
+        ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.PROD_EC2_HOST }} '
+          export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          export AWS_REGION=${{ secrets.AWS_REGION }}
+          export GITHUB_SHA='"$IMAGE_TAG"'
+          
+          cd /home/ubuntu/multi-env-cicd-app
           ./scripts/deploy.sh production
         '
+        echo "✅ Deployment completed!"
     
-    - name: Extended health check
-      env:
-        GITHUB_SHA: ${{ github.event.inputs.version || github.sha }}
+    - name: Extended health checks
       run: |
-        echo "Performing extended health checks..."
+        echo "🏥 Running extended health checks..."
+        sleep 20
+        
+        # Health check script
         ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.PROD_EC2_HOST }} '
-          cd /home/ubuntu/multi-env-cicd-app &&
+          cd /home/ubuntu/multi-env-cicd-app
           ./scripts/health-check.sh production
         '
+        
+        # Additional checks
+        PROD_URL="http://${{ secrets.PROD_EC2_HOST }}:3000"
+        echo "Testing production endpoint: $PROD_URL"
+        
+        for i in {1..5}; do
+          if curl -f $PROD_URL 2>/dev/null; then
+            echo "✅ Health check $i/5 passed"
+            sleep 5
+          else
+            echo "❌ Health check $i/5 failed"
+            exit 1
+          fi
+        done
+        
+        echo "✅ All extended health checks passed!"
     
     - name: Performance monitoring
       run: |
-        echo "Monitoring performance metrics..."
+        echo "📊 Monitoring initial performance metrics..."
+        sleep 30
+        
+        ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.PROD_EC2_HOST }} '
+          echo "CPU Usage:"
+          top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk "{print 100 - \$1\"%\"}"
+          
+          echo "Memory Usage:"
+          free -m | awk "NR==2{printf \"%.2f%%\n\", \$3*100/\$2 }"
+          
+          echo "Disk Usage:"
+          df -h | grep -vE "^Filesystem|tmpfs|cdrom" | awk "{ print \$5 \" \" \$1 }"
+          
+          echo "Docker Stats:"
+          docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}"
+        '
+        
+        echo "✅ Performance metrics collected"
     
-    - name: Send deployment success notification
+    - name: Create deployment tag
+      run: |
+        echo "🏷️ Creating deployment tag..."
+        
+        # Create version tag
+        VERSION_TAG="prod-$(date +%Y%m%d-%H%M%S)-${{ github.event.inputs.version }}"
+        
+        git tag -a $VERSION_TAG -m "Production deployment: ${{ github.event.inputs.deployment_type }}"
+        git push origin $VERSION_TAG || echo "⚠️ Tag push failed (might need permissions)"
+        
+        echo "✅ Tag created: $VERSION_TAG"
+    
+    - name: Deployment summary
       if: success()
+      run: |
+        echo "=================================="
+        echo "✅ PRODUCTION DEPLOYMENT SUCCESSFUL"
+        echo "=================================="
+        echo "📦 Version: ${{ github.event.inputs.version }}"
+        echo "🌐 Environment: Production"
+        echo "🏷️ Type: ${{ github.event.inputs.deployment_type }}"
+        echo "👤 Deployed by: ${{ github.actor }}"
+        echo "📅 Time: $(date)"
+        echo ""
+        echo "🎉 Application is now live in production!"
+        echo ""
+        echo "📊 Next steps:"
+        echo "  1. Monitor logs and metrics"
+        echo "  2. Watch for errors or anomalies"
+        echo "  3. Keep rollback plan ready"
+        echo "=================================="
+    
+    - name: Rollback instructions
+      if: failure()
+      run: |
+        echo "=================================="
+        echo "❌ DEPLOYMENT FAILED"
+        echo "=================================="
+        echo "🔄 To rollback, run this workflow again with:"
+        echo "   SHA: <previous-working-sha>"
+        echo ""
+        echo "Or manually rollback:"
+        echo "   ssh ${{ secrets.EC2_USER }}@${{ secrets.PROD_EC2_HOST }}"
+        echo "   cd /home/ubuntu/multi-env-cicd-app"
+        echo "   ./scripts/rollback.sh"
+        echo "=================================="
+    
+    - name: Send Slack notification
+      if: always()
       uses: 8398a7/action-slack@v3
       with:
-        status: success
+        status: ${{ job.status }}
         author_name: Production Deployment
-        text: "Production deployment completed successfully! Version: ${{ github.sha }}"
+        fields: workflow,job,commit,author
+        text: |
+          🔴 PRODUCTION Deployment: ${{ job.status }}
+          📦 SHA: `${{ github.event.inputs.version }}`
+          👤 By: ${{ github.actor }}
+          🏷️ Type: ${{ github.event.inputs.deployment_type }}
+          
+          ${{ job.status == 'success' && '🎉 Deployment successful! Monitor the application.' || '❌ DEPLOYMENT FAILED! Check logs immediately!' }}
+          ${{ job.status == 'failure' && '🔄 Rollback may be required!' || '' }}
       env:
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
