@@ -33,6 +33,11 @@ jobs:
         docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
         echo "Image pushed to ECR"
     
+    - name: Setup SSH agent with private key
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+    
     - name: Deploy to EC2 (Dev)
       env:
         AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
@@ -45,7 +50,7 @@ jobs:
           AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
           AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
           AWS_REGION=${{ secrets.AWS_REGION }} \
-          GITHUB_SHA=${{ github.sha }} \
+          GITHUB_SHA=$GITHUB_SHA \
           ./scripts/deploy.sh dev
         '
     
