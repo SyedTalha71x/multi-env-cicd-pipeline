@@ -108,17 +108,15 @@ jobs:
         IMAGE_TAG: ${{ github.event.inputs.version }}
       run: |
         echo "🚀 Deploying to Production EC2..."
-        echo "⚠️ This will update the production environment"
         
-        ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.PROD_EC2_HOST }} '
-          export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-          export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          export AWS_REGION=${{ secrets.AWS_REGION }}
-          export GITHUB_SHA='"$IMAGE_TAG"'
+        ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.PROD_EC2_HOST }} "
+          export AWS_ACCESS_KEY_ID='${{ secrets.AWS_ACCESS_KEY_ID }}'
+          export AWS_SECRET_ACCESS_KEY='${{ secrets.AWS_SECRET_ACCESS_KEY }}'
+          export AWS_REGION='${{ secrets.AWS_REGION }}'
           
-          cd /home/ubuntu/multi-env-cicd-app
-          ./scripts/deploy.sh production
-        '
+          cd /home/ubuntu/multi-env-cicd-pipeline
+          ./scripts/deploy.sh production '${{ secrets.AWS_ACCOUNT_ID }}' '${{ secrets.AWS_REGION }}' '${{ github.event.inputs.version }}'
+        "
         echo "✅ Deployment completed!"
     
     - name: Extended health checks
