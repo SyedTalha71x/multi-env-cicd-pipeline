@@ -24,12 +24,12 @@ jobs:
       - name: Show build info
         run: |
           echo "=================================="
-          echo "🚀 CI Pipeline Started"
+          echo " CI Pipeline Started"
           echo "=================================="
-          echo "🌿 Branch: ${{ github.ref_name }}"
-          echo "📝 Commit: ${{ github.sha }}"
-          echo "👤 Author: ${{ github.actor }}"
-          echo "📅 Date: $(date)"
+          echo " Branch: ${{ github.ref_name }}"
+          echo " Commit: ${{ github.sha }}"
+          echo " Author: ${{ github.actor }}"
+          echo " Date: $(date)"
           echo "=================================="
 
       - name: Set up Node.js
@@ -40,40 +40,40 @@ jobs:
 
       - name: Install dependencies
         run: |
-          echo "📦 Installing dependencies..."
+          echo " Installing dependencies..."
           npm ci
 
       - name: Run tests
         run: |
-          echo "🧪 Running tests..."
-          echo "⚠️ No tests defined yet"
+          echo " Running tests..."
+          echo " No tests defined yet"
 
       - name: Lint code
         run: |
-          echo "🔍 Linting code..."
-          echo "⚠️ Linting skipped"
+          echo " Linting code..."
+          echo " Linting skipped"
 
       - name: Security audit
         run: |
-          echo "🔒 Running security audit..."
-          npm run security-check || echo "⚠️ Security issues found (this is okay for demo apps)"
+          echo " Running security audit..."
+          npm run security-check || echo "Security issues found (this is okay for demo apps)"
 
       - name: Build Docker image
         run: |
-          echo "🐳 Building Docker image..."
+          echo " Building Docker image..."
           docker build -t multi-env-cicd-app:${{ github.sha }} .
-          echo "✅ Docker image built successfully"
+          echo " Docker image built successfully"
 
       - name: Test Docker container
         run: |
-          echo "🧪 Testing Docker container..."
+          echo " Testing Docker container..."
           docker run -d -p 3000:3000 --name test-app multi-env-cicd-app:${{ github.sha }}
           sleep 10
           
           if curl -f http://localhost:3000 2>/dev/null; then
-            echo "✅ Container health check passed"
+            echo " Container health check passed"
           else
-            echo "⚠️ Health check not available (this is okay for basic apps)"
+            echo " Health check not available (this is okay for basic apps)"
           fi
           
           docker stop test-app
@@ -84,15 +84,15 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const message = `## ✅ CI Pipeline Passed
+            const message = `## CI Pipeline Passed
             
             **Build Information:**
-            - 🌿 Branch: \`${context.ref}\`
-            - 📝 Commit: \`${context.sha}\`
-            - 🐳 Docker Image: Built successfully
-            - 🧪 Tests: Passed
+            -  Branch: \`${context.ref}\`
+            -  Commit: \`${context.sha}\`
+            -  Docker Image: Built successfully
+            -  Tests: Passed
             
-            Ready for review! 🚀`;
+            Ready for review! `;
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,
@@ -105,7 +105,7 @@ jobs:
         if: always()
         run: |
           echo "=================================="
-          echo "📊 CI Pipeline Summary"
+          echo " CI Pipeline Summary"
           echo "=================================="
           echo "Status: ${{ job.status }}"
           echo "Branch: ${{ github.ref_name }}"
