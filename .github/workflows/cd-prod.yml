@@ -32,23 +32,23 @@ jobs:
     - name: Deployment info
       run: |
         echo "=================================="
-        echo "🚀 PRODUCTION Deployment Started"
+        echo "PRODUCTION Deployment Started"
         echo "=================================="
-        echo "📝 Deploy SHA: ${{ github.event.inputs.version }}"
-        echo "👤 Triggered by: ${{ github.actor }}"
-        echo "📅 Date: $(date)"
-        echo "🏷️ Type: ${{ github.event.inputs.deployment_type }}"
+        echo "Deploy SHA: ${{ github.event.inputs.version }}"
+        echo "Triggered by: ${{ github.actor }}"
+        echo "Date: $(date)"
+        echo "Type: ${{ github.event.inputs.deployment_type }}"
         echo "=================================="
-        echo "⚠️ PRODUCTION DEPLOYMENT - PROCEED WITH CAUTION"
+        echo "PRODUCTION DEPLOYMENT - PROCEED WITH CAUTION"
         echo "=================================="
     
     - name: Pre-deployment checklist
       run: |
-        echo "📋 Pre-deployment checklist:"
-        echo "  ✅ Staging tests passed?"
-        echo "  ✅ Stakeholders notified?"
-        echo "  ✅ Rollback plan ready?"
-        echo "  ✅ Monitoring tools active?"
+        echo "Pre-deployment checklist:"
+        echo "  Staging tests passed?"
+        echo "  Stakeholders notified?"
+        echo "  Rollback plan ready?"
+        echo "  Monitoring tools active?"
         echo ""
         echo "Waiting for environment approval..."
     
@@ -71,43 +71,43 @@ jobs:
     - name: Verify image exists in ECR
       env:
         REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        REPOSITORY: multi-env-cicd-app
+        REPOSITORY: multi-env-cicd-pipeline
         IMAGE_TAG: ${{ github.event.inputs.version }}
       run: |
-        echo "🔍 Verifying image in ECR..."
+        echo " Verifying image in ECR..."
         
         if docker pull $REGISTRY/$REPOSITORY:$IMAGE_TAG; then
-          echo "✅ Image found and verified"
-          echo "📦 Image: $REGISTRY/$REPOSITORY:$IMAGE_TAG"
+          echo " Image found and verified"
+          echo " Image: $REGISTRY/$REPOSITORY:$IMAGE_TAG"
         else
-          echo "❌ Image not found in ECR!"
+          echo " Image not found in ECR!"
           echo "Please ensure staging deployment was successful"
           exit 1
         fi
     
     - name: Backup current production state
       run: |
-        echo "💾 Creating backup of current production state..."
+        echo " Creating backup of current production state..."
         ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.PROD_EC2_HOST }} '
-          cd /home/ubuntu/multi-env-cicd-app
+          cd /home/ubuntu/multi-env-cicd-pipeline
           
           # Save current running container info
           docker ps > /tmp/prod-backup-$(date +%Y%m%d-%H%M%S).txt
           
           # Tag current production image as backup
-          CURRENT_IMAGE=$(docker ps --format "{{.Image}}" | grep multi-env-cicd-app | head -1)
+          CURRENT_IMAGE=$(docker ps --format "{{.Image}}" | grep multi-env-cicd-pipeline | head -1)
           if [ ! -z "$CURRENT_IMAGE" ]; then
-            docker tag $CURRENT_IMAGE multi-env-cicd-app:last-known-good
-            echo "✅ Backup created: last-known-good"
+            docker tag $CURRENT_IMAGE multi-env-cicd-pipeline:last-known-good
+            echo " Backup created: last-known-good"
           fi
         '
-        echo "✅ Backup completed!"
+        echo "Backup completed!"
     
     - name: Deploy to EC2
       env:
         IMAGE_TAG: ${{ github.event.inputs.version }}
       run: |
-        echo "🚀 Deploying to Production EC2..."
+        echo "Deploying to Production EC2..."
         
         ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.PROD_EC2_HOST }} "
           export AWS_ACCESS_KEY_ID='${{ secrets.AWS_ACCESS_KEY_ID }}'
@@ -117,11 +117,11 @@ jobs:
           cd /home/ubuntu/multi-env-cicd-pipeline
           ./scripts/deploy.sh production '${{ secrets.AWS_ACCOUNT_ID }}' '${{ secrets.AWS_REGION }}' '${{ github.event.inputs.version }}'
         "
-        echo "✅ Deployment completed!"
+        echo "Deployment completed!"
     
     - name: Extended health checks
       run: |
-        echo "🏥 Running extended health checks..."
+        echo "Running extended health checks..."
         sleep 20
         
         # Health check script
@@ -136,19 +136,19 @@ jobs:
         
         for i in {1..5}; do
           if curl -f $PROD_URL 2>/dev/null; then
-            echo "✅ Health check $i/5 passed"
+            echo " Health check $i/5 passed"
             sleep 5
           else
-            echo "❌ Health check $i/5 failed"
+            echo " Health check $i/5 failed"
             exit 1
           fi
         done
         
-        echo "✅ All extended health checks passed!"
+        echo "All extended health checks passed!"
     
     - name: Performance monitoring
       run: |
-        echo "📊 Monitoring initial performance metrics..."
+        echo " Monitoring initial performance metrics..."
         sleep 30
         
         ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.PROD_EC2_HOST }} '
@@ -165,35 +165,35 @@ jobs:
           docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}"
         '
         
-        echo "✅ Performance metrics collected"
+        echo " Performance metrics collected"
     
     - name: Create deployment tag
       run: |
-        echo "🏷️ Creating deployment tag..."
+        echo " Creating deployment tag..."
         
         # Create version tag
         VERSION_TAG="prod-$(date +%Y%m%d-%H%M%S)-${{ github.event.inputs.version }}"
         
         git tag -a $VERSION_TAG -m "Production deployment: ${{ github.event.inputs.deployment_type }}"
-        git push origin $VERSION_TAG || echo "⚠️ Tag push failed (might need permissions)"
+        git push origin $VERSION_TAG || echo "Tag push failed (might need permissions)"
         
-        echo "✅ Tag created: $VERSION_TAG"
+        echo " Tag created: $VERSION_TAG"
     
     - name: Deployment summary
       if: success()
       run: |
         echo "=================================="
-        echo "✅ PRODUCTION DEPLOYMENT SUCCESSFUL"
+        echo " PRODUCTION DEPLOYMENT SUCCESSFUL"
         echo "=================================="
-        echo "📦 Version: ${{ github.event.inputs.version }}"
-        echo "🌐 Environment: Production"
-        echo "🏷️ Type: ${{ github.event.inputs.deployment_type }}"
-        echo "👤 Deployed by: ${{ github.actor }}"
-        echo "📅 Time: $(date)"
+        echo " Version: ${{ github.event.inputs.version }}"
+        echo " Environment: Production"
+        echo " Type: ${{ github.event.inputs.deployment_type }}"
+        echo " Deployed by: ${{ github.actor }}"
+        echo " Time: $(date)"
         echo ""
-        echo "🎉 Application is now live in production!"
+        echo " Application is now live in production!"
         echo ""
-        echo "📊 Next steps:"
+        echo " Next steps:"
         echo "  1. Monitor logs and metrics"
         echo "  2. Watch for errors or anomalies"
         echo "  3. Keep rollback plan ready"
@@ -203,14 +203,14 @@ jobs:
       if: failure()
       run: |
         echo "=================================="
-        echo "❌ DEPLOYMENT FAILED"
+        echo " DEPLOYMENT FAILED"
         echo "=================================="
-        echo "🔄 To rollback, run this workflow again with:"
+        echo " To rollback, run this workflow again with:"
         echo "   SHA: <previous-working-sha>"
         echo ""
         echo "Or manually rollback:"
         echo "   ssh ${{ secrets.EC2_USER }}@${{ secrets.PROD_EC2_HOST }}"
-        echo "   cd /home/ubuntu/multi-env-cicd-app"
+        echo "   cd /home/ubuntu/multi-env-cicd-pipeline"
         echo "   ./scripts/rollback.sh"
         echo "=================================="
     
@@ -227,7 +227,7 @@ jobs:
           👤 By: ${{ github.actor }}
           🏷️ Type: ${{ github.event.inputs.deployment_type }}
           
-          ${{ job.status == 'success' && '🎉 Deployment successful! Monitor the application.' || '❌ DEPLOYMENT FAILED! Check logs immediately!' }}
-          ${{ job.status == 'failure' && '🔄 Rollback may be required!' || '' }}
+          ${{ job.status == 'success' && ' Deployment successful! Monitor the application.' || ' DEPLOYMENT FAILED! Check logs immediately!' }}
+          ${{ job.status == 'failure' && ' Rollback may be required!' || '' }}
       env:
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
