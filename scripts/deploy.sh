@@ -34,7 +34,7 @@ echo "AWS Region: ${AWS_REGION}"
 echo "Docker image: ${DOCKER_IMAGE}"
 echo "Commit SHA: ${GITHUB_SHA}"
 
-# Login to ECR
+# Login to ECR (needs AWS credentials in environment)
 aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
 
 # Pull the image
@@ -46,15 +46,45 @@ echo "Stopping old container..."
 docker stop ${APP_NAME}-${ENVIRONMENT} 2>/dev/null || true
 docker rm ${APP_NAME}-${ENVIRONMENT} 2>/dev/null || true
 
-# Run new container
+# Determine which .env file to use
+PROJECT_DIR="/home/ubuntu/multi-env-cicd-pipeline"
+ENV_FILE="${PROJECT_DIR}/.env.${ENVIRONMENT}"
+
+# Check if environment-specific .env file exists
+if [ ! -f "$ENV_FILE" ]; then
+    ENV_FILE="${PROJECT_DIR}/.env"
+    echo "Using default .env file"
+else
+    echo "Using environment-specific .env file: $ENV_FILE"
+fi
+
+# Verify .env file exists
+if [ ! -f "$ENV_FILE" ]; then
+    echo "WARNING: .env file not found at $ENV_FILE"
+    echo "Container will run without environment variables from .env file"
+fi
+
+# Run new container with .env file
 echo "Starting new container..."
-docker run -d \
-  --name ${APP_NAME}-${ENVIRONMENT} \
-  --restart always \
-  -p 3000:3000 \
-  -e NODE_ENV=${ENVIRONMENT} \
-  -e PORT=3000 \
-  -e APP_VERSION=${GITHUB_SHA} \
-  ${DOCKER_IMAGE}
+if [ -f "$ENV_FILE" ]; then
+    echo "Loading environment variables from: $ENV_FILE"
+    docker run -d \
+      --name ${APP_NAME}-${ENVIRONMENT} \
+      --restart always \
+      -p 3000:3000 \
+      --env-file "$ENV_FILE" \
+      -e NODE_ENV=${ENVIRONMENT} \
+      -e APP_VERSION=${GITHUB_SHA} \
+      ${DOCKER_IMAGE}
+else
+    echo "Starting container without .env file"
+    docker run -d \
+      --name ${APP_NAME}-${ENVIRONMENT} \
+      --restart always \
+      -p 3000:3000 \
+      -e NODE_ENV=${ENVIRONMENT} \
+      -e APP_VERSION=${GITHUB_SHA} \
+      ${DOCKER_IMAGE}
+fi
 
 echo "Deployment completed for $ENVIRONMENT"
