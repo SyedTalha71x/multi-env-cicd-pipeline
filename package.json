@@ -1,0 +1,60 @@
+{
+  "name": "multi-env-cicd-pipeline",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "jest",
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "test-unit": "jest --testPathPattern=unit",
+    "test-integration": "jest --testPathPattern=integration",
+    "lint": "eslint src/**/*.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "lint": "eslint src/** tests/**",
+    "lint:fix": "eslint src/** tests/** --fix",
+    "format": "prettier --write src/** tests/**",
+    "security-check": "npm audit",
+    "docker:build": "docker build -t multi-env-cicd-app .",
+    "docker:run": "docker run -p 3000:3000 multi-env-cicd-app",
+    "docker:test": "docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
+    "express-validator": "^7.3.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.1.2",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
+    "uuid": "^13.0.0",
+    "winston": "^3.19.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.5",
+    "@babel/preset-env": "^7.28.5",
+    "@faker-js/faker": "^10.2.0",
+    "@types/jest": "^30.0.0",
+    "babel-jest": "^30.2.0",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "jest": "^30.2.0",
+    "jest-junit": "^16.0.0",
+    "mongodb-memory-server": "^11.0.1",
+    "nodemon": "^3.1.11",
+    "prettier": "^3.7.4",
+    "supertest": "^7.2.2"
+  }
+}
