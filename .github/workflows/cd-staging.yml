@@ -1,0 +1,52 @@
+name: Deploy to Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy'
+        required: true
+        default: 'latest'
+
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+    environment: staging
+    needs: [deploy-dev]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+    
+    - name: Deploy to EC2 (Staging)
+      env:
+        IMAGE_TAG: ${{ github.event.inputs.version || github.sha }}
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.STAGING_EC2_HOST }} '
+          cd /home/ubuntu/multi-env-cicd-app &&
+          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
+          AWS_REGION=${{ secrets.AWS_REGION }} \
+          GITHUB_SHA=$IMAGE_TAG \
+          ./scripts/deploy.sh staging
+        '
+    
+    - name: Run automated tests in staging
+      run: |
+        echo "Running automated tests against staging environment..."
+        # Add your staging environment tests here
+    
+    - name: Send Slack notification
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        author_name: Staging Deployment
+        fields: workflow,job,commit
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

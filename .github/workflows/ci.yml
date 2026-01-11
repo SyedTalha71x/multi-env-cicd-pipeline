@@ -1,0 +1,36 @@
+name: Continuous Integration
+
+
+on:
+  pull_request:
+    branches: [main, development]
+  push:
+    branches: [development]
+
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: echo "No tests defined yet"
+
+      - name: Lint code
+        run: npm run lint
+
+      - name: Build Docker image
+        run: |
+          docker build -t multi-env-cicd-app:test .
+          echo "Image built successfully"
